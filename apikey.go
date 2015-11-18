@@ -6,51 +6,72 @@ import (
 	"errors"
 	"encoding/json"
 	"strings"
+	"sync"
 )
 
 var (
 	ErrFieldDoesntExistOrNotType = errors.New("Field does not exist or is incorrect type")
+	ErrKeyRequired = errors.New("Key is required")
+	ErrKeyNotFound = errors.New("Key not found")
+	ErrKeyNotAuthorised = errors.New("Key not authorised")
 )
 
+// KeyStore is an interface for the APIKey to a backend
 type KeyStore interface {
-	Check(string, *echo.Context) (bool)
+	// Get returns a pointer to a Key type from the keystore
+	Get(string) (*Key, error)
 }
 
+// APIKey is a object to manage the authorization of API requests
 type APIKey struct {
 	store		KeyStore
+	// Required decided if the requestor MUST supply an apikey
+	Required	bool
 }
 
 // NewKey creates a new API Key management object using the provided
 // KeyStore as a backend for storage
-func NewKey(ks KeyStore) (*APIKey, error) {
+func NewAPIKey(ks KeyStore) (*APIKey, error) {
 	return &APIKey{store: ks}, nil
 }
 
 // Middleware returns a function that can be passed to echo.Use
 func (k *APIKey) Middleware() echo.Middleware {
 	return func(ctx *echo.Context) error {
-		return k.authorize(ctx)
+		if key, ok := ctx.Request().Header["X-API-Key"]; ok {
+			kv, err := k.store.Get(key[0])
+			if err != nil {
+				return nil
+			}
+			ctx.Set("apikey", kv)
+		}
+		if key := ctx.Param("apikey"); key != "" {
+			kv, err := k.store.Get(key)
+			if err != nil {
+				return nil
+			}
+			ctx.Set("apikey", kv)
+		}
+		return ErrKeyRequired
 	}
 }
 
-func (k *APIKey) authorize(ctx *echo.Context) error {
-	return nil
-}
-
+// Key is the representation of an individual API Key, it supports having extra data
+// stored in it which can be collected out using the various methods
 type Key struct {
 	Key		string
 	Paths	[]string
 	extra	map[string]interface{}
 }
 
-func (k *Key) GetField(field string) (interface{}, error) {
+func (k *Key) Field(field string) (interface{}, error) {
 	if v, ok := k.extra[field]; ok {
 		return v, nil
 	}
 	return false, ErrFieldDoesntExistOrNotType
 }
 
-func (k *Key) GetBool(field string) (bool, error) {
+func (k *Key) Bool(field string) (bool, error) {
 	if v, ok := k.extra[field].(bool); ok {
 		return v, nil
 	}
@@ -63,11 +84,23 @@ func (k *Key) GetBool(field string) (bool, error) {
 	return false, ErrFieldDoesntExistOrNotType
 }
 
+func (k *Key) String(field string) (string, error) {
+	if v, ok := k.extra[field].(string); ok {
+		return v, nil
+	}
+	return "", ErrFieldDoesntExistOrNotType
+}
+
+// JSONKeyStore implements the KeyStore interface and loads its data from the file
+// provided when you instantate the type
 type JSONKeyStore struct {
 	filename		string
 	keys			map[string]*Key
+	lock			sync.RWMutex
 }
 
+// NewJSONKeyStore creates a new instance of JSONKeyStore and attempts to load the data
+// from the filename provided. If it fails to load key data it returns an error
 func NewJSONKeyStore(filename string) (KeyStore, error) {
 	jks := &JSONKeyStore{filename: filename, keys: make(map[string]*Key)}
 
@@ -102,6 +135,13 @@ func (j *JSONKeyStore) loadData() error {
 	return nil
 }
 
-func (j *JSONKeyStore) Check(key string, ctx *echo.Context) bool {
-	return false
+func (j *JSONKeyStore) Get(key string) (*Key, error) {
+	j.lock.RLock()
+	defer j.lock.RUnlock()
+
+	if v, ok := j.keys[key]; ok {
+		return v, nil
+	}
+	
+	return nil, ErrKeyNotFound
 }
