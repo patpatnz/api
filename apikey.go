@@ -20,10 +20,13 @@ type APIKey struct {
 	store		KeyStore
 }
 
+// NewKey creates a new API Key management object using the provided
+// KeyStore as a backend for storage
 func NewKey(ks KeyStore) (*APIKey, error) {
 	return &APIKey{store: ks}, nil
 }
 
+// Middleware returns a function that can be passed to echo.Use
 func (k *APIKey) Middleware() echo.Middleware {
 	return func(ctx *echo.Context) error {
 		return k.authorize(ctx)
