@@ -1,4 +1,5 @@
-package api
+// package apikey is an API key manager middleware for echo
+package apikey
 
 import (
 	"encoding/json"

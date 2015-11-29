@@ -1,4 +1,4 @@
-package api
+package apikey
 
 // JSONKeyStore implements the KeyStore interface and loads its data from the file
 // provided when you instantate the type

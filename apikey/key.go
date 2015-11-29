@@ -1,4 +1,4 @@
-package api
+package apikey
 
 // Key is the representation of an individual API Key, it supports having extra data
 // stored in it which can be collected out using the various methods
