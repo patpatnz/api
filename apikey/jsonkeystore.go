@@ -1,5 +1,11 @@
 package apikey
 
+import (
+	"encoding/json"
+	"io/ioutil"
+	"sync"
+)
+
 // JSONKeyStore implements the KeyStore interface and loads its data from the file
 // provided when you instantate the type
 type JSONKeyStore struct {
@@ -29,22 +35,29 @@ func (j *JSONKeyStore) loadData() error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(buf, j.keys)
-	if err != nil {
-		return err
-	}
+	//	err = json.Unmarshal(buf, j.keys)
+	//	if err != nil {
+	//		return err
+	//	}
 	ex := make(map[string]map[string]interface{})
-	err = json.Unmarshal(buf, ex)
+	err = json.Unmarshal(buf, &ex)
 	if err != nil {
 		return err
 	}
+	j.keys = make(map[string]*Key)
 	for key, val := range ex {
+		k := &Key{extra: make(map[string]interface{})}
 		for field, dat := range val {
 			if field == "paths" {
+				if l, ok := dat.([]string); ok {
+					k.paths = l
+				}
+				k.CalculateRegexp()
 				continue
 			}
-			j.keys[key].extra[field] = dat
+			k.extra[field] = dat
 		}
+		j.keys[key] = k
 	}
 	return nil
 }
