@@ -1,3 +1,4 @@
+// result is a helper package to give consistent result formats
 package result
 
 import (
