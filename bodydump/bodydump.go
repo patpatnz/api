@@ -1,5 +1,15 @@
 package bodydump
 
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/labstack/echo"
+	"github.com/spf13/viper"
+)
+
 type bodyDump struct {
 	Time            time.Time    `json:"time"`
 	RequestID       string       `json:"id"`
@@ -9,6 +19,7 @@ type bodyDump struct {
 	ResponseHeaders *http.Header `json:"request_headers"`
 }
 
+// BodyDump provides a dump of the body in error situations
 func BodyDump(c echo.Context, reqBody, resBody []byte) {
 	status := c.Response().Status
 	if viper.GetBool("debug") || ((status < 199 || status > 299) && status != 404) {
@@ -25,4 +36,3 @@ func BodyDump(c echo.Context, reqBody, resBody []byte) {
 		fmt.Println(string(buf))
 	}
 }
-
